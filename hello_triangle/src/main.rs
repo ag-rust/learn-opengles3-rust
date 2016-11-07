@@ -5,7 +5,7 @@ use std::ptr;
 use std::ffi::CStr;
 use std::os::raw::c_char;
 use gleam::gl;
-use gleam::gl::{GLenum, GLfloat, GLint, GLuint};
+use gleam::gl::{GLenum, GLint, GLsizei, GLuint};
 
 struct Context {
     program_object: GLuint,
@@ -83,10 +83,7 @@ fn initialize() -> Option<Context> {
     }
 }
 
-fn draw(context: &Context) {
-    let width = 500;
-    let height = 500;
-
+fn draw(context: &Context, width: GLsizei, height: GLsizei) {
     let v_vertices: [f32; 9] = [
         0.0, 0.5, 0.0,
         -0.5, -0.5, 0.0,
@@ -94,13 +91,12 @@ fn draw(context: &Context) {
     ];
 
     unsafe {
-        // gl::Viewport(0, 0, 1, 1);
+        gl::Viewport(0, 0, width, height);
         gl::Clear(gl::COLOR_BUFFER_BIT);
         gl::UseProgram(context.program_object);
         gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 0, v_vertices.as_ptr() as *const _);
         gl::EnableVertexAttribArray(0);
-        gl::PointSize(10.0);
-        gl::DrawArrays(gl::POINTS, 0, 3);
+        gl::DrawArrays(gl::TRIANGLES, 0, 3);
     }
 }
 
@@ -113,12 +109,13 @@ fn main() {
 
     gl::load_with(|symbol| window.get_proc_address(symbol) as *const _);
 
-    println!("{}", get_string(gl::VERSION));
+    println!("GL VERSION: {}", get_string(gl::VERSION));
 
     let context = initialize().unwrap();
 
     for event in window.wait_events() {
-        draw(&context);
+        let (width, height) = window.get_inner_size().unwrap();
+        draw(&context, width as GLsizei, height as GLsizei);
 
         let _ = window.swap_buffers();
 
@@ -130,17 +127,18 @@ fn main() {
 }
 
 const VS_SRC: &'static [u8] = b"
-#version 100
-attribute vec3 vPosition;
+#version 300 es
+layout(location = 0) in vec4 vPosition;
 void main() {
-    gl_Position = vec4(vPosition, 1.0);
+    gl_Position = vPosition;
 }
 \0";
 
 const FS_SRC: &'static [u8] = b"
-#version 100
+#version 300 es
 precision mediump float;
+out vec4 fragColor;
 void main() {
-    gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+    fragColor = vec4(1.0, 0.0, 0.0, 1.0);
 }
 \0";
