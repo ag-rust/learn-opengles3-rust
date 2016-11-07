@@ -2,6 +2,8 @@ extern crate gleam;
 extern crate glutin;
 
 use std::ptr;
+use std::ffi::CStr;
+use std::os::raw::c_char;
 use gleam::gl;
 use gleam::gl::{GLenum, GLfloat, GLint, GLuint};
 
@@ -12,7 +14,11 @@ struct Context {
 fn get_string(name: GLenum) -> String {
     unsafe {
         let buffer = gl::GetString(name);
-        String::from_raw_parts(buffer as *mut u8, 100, 100)
+        CStr::from_ptr(buffer as *mut c_char)
+            .to_owned()
+            .into_string()
+            .ok()
+            .unwrap()
     }
 }
 
