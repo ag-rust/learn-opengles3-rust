@@ -1,11 +1,10 @@
 extern crate libc;
 extern crate gleam;
-
-mod emscripten;
+extern crate emscripten_sys;
 
 use gleam::gl;
 use gleam::gl::{GLuint};
-use emscripten::{
+use emscripten_sys::{
     emscripten_set_main_loop_arg,
     emscripten_webgl_init_context_attributes,
     emscripten_webgl_create_context,
@@ -67,7 +66,6 @@ fn step(ctx: &mut Context) {
     ctx.draw();
 }
 
-
 extern fn loop_wrapper(ctx: *mut libc::c_void) {
     unsafe {
         let mut ctx = &mut *(ctx as *mut Context);
@@ -88,7 +86,7 @@ fn main() {
         });
         let mut ctx = Context::new(gl);
         let ptr = &mut ctx as *mut _ as *mut libc::c_void;
-        emscripten_set_main_loop_arg(loop_wrapper, ptr, 0, 1);
+        emscripten_set_main_loop_arg(Some(loop_wrapper), ptr, 0, 1);
     }
 }
 

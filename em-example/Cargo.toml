@@ -6,3 +6,4 @@ authors = ["Yosuke ONOUE <onoue@likr-lab.com>"]
 [dependencies]
 libc = "*"
 gleam = "*"
+emscripten-sys = {path = '/Users/likr/sandbox/emsys/emscripten-sys'}
