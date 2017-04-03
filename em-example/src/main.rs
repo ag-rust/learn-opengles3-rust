@@ -3,7 +3,7 @@ extern crate gleam;
 extern crate emscripten_sys;
 
 use gleam::gl;
-use gleam::gl::{GLuint};
+use gleam::gl::{GLenum, GLuint};
 use emscripten_sys::{
     emscripten_set_main_loop_arg,
     emscripten_webgl_init_context_attributes,
@@ -13,41 +13,60 @@ use emscripten_sys::{
     EmscriptenWebGLContextAttributes,
 };
 
+type GlPtr = std::rc::Rc<gl::Gl>;
+
 #[repr(C)]
 struct Context {
-    gl: std::rc::Rc<gl::Gl>,
+    gl: GlPtr,
     program: GLuint,
     buffer: GLuint,
 }
 
-impl Context {
-    fn new(gl: std::rc::Rc<gl::Gl>) -> Context {
-        let v_vertices: [f32; 9] = [
-            0.0, 0.5, 0.0,
-            -0.5, -0.5, 0.0,
-            0.5, -0.5, 0.0,
-        ];
+fn load_shader(gl: &GlPtr, shader_type: GLenum, source: &[&[u8]]) -> Option<GLuint> {
+    let shader = gl.create_shader(shader_type);
+    if shader == 0 {
+        return None;
+    }
+    gl.shader_source(shader, source);
+    gl.compile_shader(shader);
+    let compiled = gl.get_shader_iv(shader, gl::COMPILE_STATUS);
+    if compiled == 0 {
+        let log = gl.get_shader_info_log(shader);
+        println!("{}", log);
+        gl.delete_shader(shader);
+        return None;
+    }
+    Some(shader)
+}
 
-        let v_shader = gl.create_shader(gl::VERTEX_SHADER);
-        gl.shader_source(v_shader, VS_SRC);
-        gl.compile_shader(v_shader);
-        let f_shader = gl.create_shader(gl::FRAGMENT_SHADER);
-        gl.shader_source(f_shader, FS_SRC);
-        gl.compile_shader(f_shader);
+fn init_buffer(gl: &GlPtr) -> Option<GLuint> {
+    let v_vertices: [f32; 9] = [
+        0.0, 0.5, 0.0,
+        -0.5, -0.5, 0.0,
+        0.5, -0.5, 0.0,
+    ];
+    let buffers = gl.gen_buffers(1);
+    gl.bind_buffer(gl::ARRAY_BUFFER, buffers[0]);
+    gl.buffer_data_untyped(gl::ARRAY_BUFFER, 36, v_vertices.as_ptr() as *const _, gl::STATIC_DRAW);
+    Some(buffers[0])
+}
+
+impl Context {
+    fn new(gl: GlPtr) -> Context {
+        let v_shader = load_shader(&gl, gl::VERTEX_SHADER, VS_SRC).unwrap();
+        let f_shader = load_shader(&gl, gl::FRAGMENT_SHADER, FS_SRC).unwrap();
         let program = gl.create_program();
         gl.attach_shader(program, v_shader);
         gl.attach_shader(program, f_shader);
         gl.link_program(program);
         gl.use_program(program);
         gl.enable_vertex_attrib_array(0);
-        let buffers = gl.gen_buffers(1);
-        gl.bind_buffer(gl::ARRAY_BUFFER, buffers[0]);
-        gl.buffer_data_untyped(gl::ARRAY_BUFFER, 36, v_vertices.as_ptr() as *const _, gl::STATIC_DRAW);
+        let buffer = init_buffer(&gl).unwrap();
         gl.clear_color(0.0, 0.0, 0.0, 1.0);
         Context {
             gl: gl,
             program: program,
-            buffer: buffers[0],
+            buffer: buffer,
         }
     }
 
@@ -90,14 +109,15 @@ fn main() {
     }
 }
 
-const VS_SRC: &'static [&[u8]] = &[b"
-attribute mediump vec3 vPosition;
+const VS_SRC: &'static [&[u8]] = &[b"#version 300 es
+layout(location = 0) in vec4 vPosition;
 void main() {
-    gl_Position = vec4(vPosition, 1.0);
+    gl_Position = vPosition;
 }"];
 
-const FS_SRC: &'static [&[u8]] = &[b"
+const FS_SRC: &'static [&[u8]] = &[b"#version 300 es
 precision mediump float;
+out vec4 fragColor;
 void main() {
-    gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+    fragColor = vec4(1.0, 0.0, 0.0, 1.0);
 }"];
